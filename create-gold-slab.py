@@ -5,7 +5,7 @@ import random
 
 # 5 5x6 layers: 14.7 x 15.2 A  (150 atoms)
 # 4 7x8 layers: 20.5 x 20.3 A  (224 atoms)
-CellReplication = [18, 25, 2 ]
+CellReplication = [20, 22, 3 ]
 
 # Au-Au distance 2.93 A
 LatticeConst = math.sqrt(2.0)*4.1436457/2.0
@@ -15,16 +15,8 @@ CellZDimension = 100.0
 
 ################################################################################
 
-# Coordinates of atoms in one cell
-#
-# f_xyz - output XYZ file
-# f_gro - output GRO file
-# f_pdb - output PDB file
-# f_top - output TOP file
-# v     - position of the cell
-# surf  - surface layer
-# ar    - residuum / atom ID
-def cell_coord(f_xyz,f_gro,f_pdb,f_top,v,surf,ar):
+# Coordinates of atoms in one cell - now BUFFERS instead of writing directly
+def cell_coord(f_xyz, buf_aus, buf_aui, buf_aub, v, surf):
   hy = math.sqrt(3.0)/2.0
   hz = math.sqrt(2.0/3.0)
   # basis vector
@@ -53,56 +45,23 @@ def cell_coord(f_xyz,f_gro,f_pdb,f_top,v,surf,ar):
   q[0] = a[0] + qr*math.cos(phi)*math.sin(tht)
   q[1] = a[1] + qr*math.sin(phi)*math.sin(tht)
   q[2] = a[2] + qr*math.cos(tht)
-  # Save coordinates
+  # Save XYZ (unchanged order)
   f_xyz.write("Au {:12.6f}{:12.6f}{:12.6f}\n".format(a[0],a[1],a[2]))
+  # Buffer for reordering
   if (surf!=0):
-    f_gro.write("{:5d}{:7s}{:3s}{:5d}{:8.3f}{:8.3f}{:8.3f}\n". \
-      format(ar[1],'AUS','AU',ar[0],a[0]/10.0,a[1]/10.0,a[2]/10.0))
-    f_pdb.write("{:8s}{:3d} {:4s} {:3s}{:6d}    {:8.3f}{:8.3f}{:8.3f}{:8.4f}\n". \
-      format('HETATM',ar[0],'AU','AUS',ar[1],a[0],a[1],a[2],0.0))
-    ar[0] = ar[0] + 1
-    f_gro.write("{:5d}{:7s}{:3s}{:5d}{:8.3f}{:8.3f}{:8.3f}\n". \
-      format(ar[1],'AUS','AUC',ar[0],q[0]/10.0,q[1]/10.0,q[2]/10.0))
-    f_pdb.write("{:8s}{:3d} {:4s} {:3s}{:6d}    {:8.3f}{:8.3f}{:8.3f}{:8.4f}\n". \
-      format('HETATM',ar[0],'AUC','AUS',ar[1],q[0],q[1],q[2],0.0))
-    ar[0] = ar[0] + 1
-    ar[1] = ar[1] + 1
-    f_top.write("GoldSurface       1\n");
-    # Virtual sites
-    x = [ 0.0, 0.0, 0.0 ]
+    # AU + AUC go into buf_aus
+    buf_aus.append(('AU', 'AUS', a[:], 'atom'))
+    buf_aus.append(('AUC','AUS', q[:], 'charge'))
+    # Virtual sites go into buf_aui
     r = 2.93
-    x[0] = a[0]
-    x[1] = a[1] + r*math.sqrt(3.0)/3.0
-    x[2] = a[2]
-    f_gro.write("{:5d}{:7s}{:3s}{:5d}{:8.3f}{:8.3f}{:8.3f}\n". \
-      format(ar[1],'AUI','AUI',ar[0],x[0]/10.0,x[1]/10.0,x[2]/10.0))
-    f_pdb.write("{:8s}{:3d} {:4s} {:3s}{:6d}    {:8.3f}{:8.3f}{:8.3f}{:8.4f}\n". \
-      format('HETATM',ar[0],'AUI','AUI',ar[1],x[0],x[1],x[2],0.0))
-    ar[0] = ar[0] + 1
-    ar[1] = ar[1] + 1
-    x[0] = a[0]
-    x[1] = a[1] - r*math.sqrt(3.0)/3.0
-    x[2] = a[2]
-    f_gro.write("{:5d}{:7s}{:3s}{:5d}{:8.3f}{:8.3f}{:8.3f}\n". \
-      format(ar[1],'AUI','AUI',ar[0],x[0]/10.0,x[1]/10.0,x[2]/10.0))
-    f_pdb.write("{:8s}{:3d} {:4s} {:3s}{:6d}    {:8.3f}{:8.3f}{:8.3f}{:8.4f}\n". \
-      format('HETATM',ar[0],'AUI','AUI',ar[1],x[0],x[1],x[2],0.0))
-    ar[0] = ar[0] + 1
-    ar[1] = ar[1] + 1
-    f_top.write("GoldVirtualSite   2\n");
+    x1 = [a[0], a[1] + r*math.sqrt(3.0)/3.0, a[2]]
+    x2 = [a[0], a[1] - r*math.sqrt(3.0)/3.0, a[2]]
+    buf_aui.append(('AUI','AUI', x1[:]))
+    buf_aui.append(('AUI','AUI', x2[:]))
   else:
-    f_gro.write("{:5d}{:7s}{:3s}{:5d}{:8.3f}{:8.3f}{:8.3f}\n". \
-      format(ar[1],'AUB','AU',ar[0],a[0]/10.0,a[1]/10.0,a[2]/10.0))
-    f_pdb.write("{:8s}{:3d} {:4s} {:3s}{:6d}    {:8.3f}{:8.3f}{:8.3f}{:8.4f}\n". \
-      format('HETATM',ar[0],'AU','AUB',ar[1],a[0],a[1],a[2],0.0))
-    ar[0] = ar[0] + 1
-    f_gro.write("{:5d}{:7s}{:3s}{:5d}{:8.3f}{:8.3f}{:8.3f}\n". \
-      format(ar[1],'AUB','AUC',ar[0],q[0]/10.0,q[1]/10.0,q[2]/10.0))
-    f_pdb.write("{:8s}{:3d} {:4s} {:3s}{:6d}    {:8.3f}{:8.3f}{:8.3f}{:8.4f}\n". \
-      format('HETATM',ar[0],'AUC','AUB',ar[1],q[0],q[1],q[2],0.0))
-    ar[0] = ar[0] + 1
-    ar[1] = ar[1] + 1
-    f_top.write("GoldBulk          1\n");
+    # Bulk AU + AUC go into buf_aub
+    buf_aub.append(('AU', 'AUB', a[:], 'atom'))
+    buf_aub.append(('AUC','AUB', q[:], 'charge'))
 
 # Main function
 def main():
@@ -116,12 +75,35 @@ def main():
   c = [ 0.0, 0.0, 0.0 ]
   c[0] = CellReplication[0]*LatticeConst
   c[1] = CellReplication[1]*ly
-#  c[2] = CellReplication[2]*lz
   c[2] = CellZDimension
   # Output files
   f_xyz = open('gold-slab.xyz','w')
   f_xyz.write("{:d}\n".format(na))
   f_xyz.write("Box: {:12.6f}{:12.6f}{:12.6f}\n".format(c[0],c[1],c[2]))
+
+  # Buffers for reordering
+  buf_aus = []  # Surface AU + AUC
+  buf_aui = []  # Virtual sites AUI
+  buf_aub = []  # Bulk AU + AUC
+
+  # Cell origin
+  orig = [ 0, 0, 0 ]
+  # Z direction
+  for k in range(CellReplication[2]):
+    orig[2] = k
+    surf = 0
+    if (k==0 or (k+1)==CellReplication[2]):
+      surf = 1
+    # X-Y layers
+    for j in range(CellReplication[1]):
+      orig[1] = j
+      for i in range(CellReplication[0]):
+        orig[0] = i
+        cell_coord(f_xyz, buf_aus, buf_aui, buf_aub, orig, surf)
+
+  f_xyz.close()
+
+  # Now write GRO, PDB, TOP in desired order: AUS -> AUI -> AUB
   f_gro = open('gold-slab.gro','w')
   f_gro.write('Gold slab\n')
   f_gro.write("{:d}\n".format(na+nq+nx))
@@ -139,27 +121,68 @@ def main():
   f_top.write('Gold slab\n\n')
   f_top.write('[ molecules ]\n')
   f_top.write('; Compound        #mols\n')
-  # Cell origin
-  orig = [ 0, 0, 0 ]
-  ar = [ 1, 1 ]
-  # Z direction
-  for k in range(CellReplication[2]):
-    orig[2] = k
-    surf = 0
-    if (k==0 or (k+1)==CellReplication[2]):
-      surf = 1
-    # X-Y layers
-    for j in range(CellReplication[1]):
-      orig[1] = j
-      for i in range(CellReplication[0]):
-        orig[0] = i
-        # Save coordinates
-        cell_coord(f_xyz,f_gro,f_pdb,f_top,orig,surf,ar)
+
+  atom_id = 1
+  res_id = 1
+
+  # 1) AUS: surface AU + AUC (written in pairs)
+  n_aus_pairs = len(buf_aus) // 2
+  for i in range(0, len(buf_aus), 2):
+    au  = buf_aus[i]    # ('AU', 'AUS', coords, 'atom')
+    auc = buf_aus[i+1]  # ('AUC','AUS', coords, 'charge')
+    f_gro.write("{:5d}{:7s}{:3s}{:5d}{:8.3f}{:8.3f}{:8.3f}\n".format(
+      res_id,'AUS','AU',atom_id,au[2][0]/10.0,au[2][1]/10.0,au[2][2]/10.0))
+    f_pdb.write("{:8s}{:3d} {:4s} {:3s}{:6d}    {:8.3f}{:8.3f}{:8.3f}{:8.4f}\n".format(
+      'HETATM',atom_id,'AU','AUS',res_id,au[2][0],au[2][1],au[2][2],0.0))
+    atom_id += 1
+    f_gro.write("{:5d}{:7s}{:3s}{:5d}{:8.3f}{:8.3f}{:8.3f}\n".format(
+      res_id,'AUS','AUC',atom_id,auc[2][0]/10.0,auc[2][1]/10.0,auc[2][2]/10.0))
+    f_pdb.write("{:8s}{:3d} {:4s} {:3s}{:6d}    {:8.3f}{:8.3f}{:8.3f}{:8.4f}\n".format(
+      'HETATM',atom_id,'AUC','AUS',res_id,auc[2][0],auc[2][1],auc[2][2],0.0))
+    atom_id += 1
+    res_id += 1
+
+  # 2) AUI: virtual sites (written in pairs per original surface atom)
+  n_aui_pairs = len(buf_aui) // 2
+  for i in range(0, len(buf_aui), 2):
+    v1 = buf_aui[i]
+    v2 = buf_aui[i+1]
+    f_gro.write("{:5d}{:7s}{:3s}{:5d}{:8.3f}{:8.3f}{:8.3f}\n".format(
+      res_id,'AUI','AUI',atom_id,v1[2][0]/10.0,v1[2][1]/10.0,v1[2][2]/10.0))
+    f_pdb.write("{:8s}{:3d} {:4s} {:3s}{:6d}    {:8.3f}{:8.3f}{:8.3f}{:8.4f}\n".format(
+      'HETATM',atom_id,'AUI','AUI',res_id,v1[2][0],v1[2][1],v1[2][2],0.0))
+    atom_id += 1
+    f_gro.write("{:5d}{:7s}{:3s}{:5d}{:8.3f}{:8.3f}{:8.3f}\n".format(
+      res_id,'AUI','AUI',atom_id,v2[2][0]/10.0,v2[2][1]/10.0,v2[2][2]/10.0))
+    f_pdb.write("{:8s}{:3d} {:4s} {:3s}{:6d}    {:8.3f}{:8.3f}{:8.3f}{:8.4f}\n".format(
+      'HETATM',atom_id,'AUI','AUI',res_id,v2[2][0],v2[2][1],v2[2][2],0.0))
+    atom_id += 1
+    res_id += 1
+
+  # 3) AUB: bulk AU + AUC (written in pairs)
+  for i in range(0, len(buf_aub), 2):
+    au  = buf_aub[i]
+    auc = buf_aub[i+1]
+    f_gro.write("{:5d}{:7s}{:3s}{:5d}{:8.3f}{:8.3f}{:8.3f}\n".format(
+      res_id,'AUB','AU',atom_id,au[2][0]/10.0,au[2][1]/10.0,au[2][2]/10.0))
+    f_pdb.write("{:8s}{:3d} {:4s} {:3s}{:6d}    {:8.3f}{:8.3f}{:8.3f}{:8.4f}\n".format(
+      'HETATM',atom_id,'AU','AUB',res_id,au[2][0],au[2][1],au[2][2],0.0))
+    atom_id += 1
+    f_gro.write("{:5d}{:7s}{:3s}{:5d}{:8.3f}{:8.3f}{:8.3f}\n".format(
+      res_id,'AUB','AUC',atom_id,auc[2][0]/10.0,auc[2][1]/10.0,auc[2][2]/10.0))
+    f_pdb.write("{:8s}{:3d} {:4s} {:3s}{:6d}    {:8.3f}{:8.3f}{:8.3f}{:8.4f}\n".format(
+      'HETATM',atom_id,'AUC','AUB',res_id,auc[2][0],auc[2][1],auc[2][2],0.0))
+    atom_id += 1
+    res_id += 1
+
+  # Topology: three summary lines
+  f_top.write("GoldSurface       {:d}\n".format(len(buf_aus)//2))
+  f_top.write("GoldVirtualSite   {:d}\n".format(len(buf_aui)//2))
+  f_top.write("GoldBulk          {:d}\n".format(len(buf_aub)//2))
+
   # Cell size
-  f_gro.write("{:10.5f} {:10.5f} {:10.5f}\n". \
-    format(c[0]/10.0,c[1]/10.0,c[2]/10.0))
+  f_gro.write("{:10.5f} {:10.5f} {:10.5f}\n".format(c[0]/10.0,c[1]/10.0,c[2]/10.0))
   # Close files
-  f_xyz.close()
   f_gro.close()
   f_pdb.close()
   f_top.close()
