@@ -5,7 +5,7 @@ import random
 
 # 5 5x6 layers: 14.7 x 15.2 A  (150 atoms)
 # 4 7x8 layers: 20.5 x 20.3 A  (224 atoms)
-CellReplication = [20, 22, 3 ]
+CellReplication = [18, 25, 2 ]
 
 # Au-Au distance 2.93 A
 LatticeConst = math.sqrt(2.0)*4.1436457/2.0
@@ -144,18 +144,11 @@ def main():
 
   # 2) AUI: virtual sites (written in pairs per original surface atom)
   n_aui_pairs = len(buf_aui) // 2
-  for i in range(0, len(buf_aui), 2):
-    v1 = buf_aui[i]
-    v2 = buf_aui[i+1]
+  for v in buf_aui:
     f_gro.write("{:5d}{:7s}{:3s}{:5d}{:8.3f}{:8.3f}{:8.3f}\n".format(
-      res_id,'AUI','AUI',atom_id,v1[2][0]/10.0,v1[2][1]/10.0,v1[2][2]/10.0))
+      res_id,'AUI','AUI',atom_id,v[2][0]/10.0,v[2][1]/10.0,v[2][2]/10.0))
     f_pdb.write("{:8s}{:3d} {:4s} {:3s}{:6d}    {:8.3f}{:8.3f}{:8.3f}{:8.4f}\n".format(
-      'HETATM',atom_id,'AUI','AUI',res_id,v1[2][0],v1[2][1],v1[2][2],0.0))
-    atom_id += 1
-    f_gro.write("{:5d}{:7s}{:3s}{:5d}{:8.3f}{:8.3f}{:8.3f}\n".format(
-      res_id,'AUI','AUI',atom_id,v2[2][0]/10.0,v2[2][1]/10.0,v2[2][2]/10.0))
-    f_pdb.write("{:8s}{:3d} {:4s} {:3s}{:6d}    {:8.3f}{:8.3f}{:8.3f}{:8.4f}\n".format(
-      'HETATM',atom_id,'AUI','AUI',res_id,v2[2][0],v2[2][1],v2[2][2],0.0))
+      'HETATM',atom_id,'AUI','AUI',res_id,v[2][0],v[2][1],v[2][2],0.0))
     atom_id += 1
     res_id += 1
 
@@ -177,7 +170,7 @@ def main():
 
   # Topology: three summary lines
   f_top.write("GoldSurface       {:d}\n".format(len(buf_aus)//2))
-  f_top.write("GoldVirtualSite   {:d}\n".format(len(buf_aui)//2))
+  f_top.write("GoldVirtualSite   {:d}\n".format(len(buf_aui)))
   f_top.write("GoldBulk          {:d}\n".format(len(buf_aub)//2))
 
   # Cell size
