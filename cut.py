@@ -9,8 +9,8 @@ Guarantees
 ----------
 ✓ slab origin unchanged (good for DFT)
 ✓ registry preserved (protein shifted by integer lattice vector)
-✓ ≥ `pad` nm free space on each side
-✓ shift chosen so protein COM is as close as possible to slab centre
+✓ ≥ `pad` nm free space on each side
+✓ shift chosen so protein is centred (balanced gaps in x and y)
 ✓ prints the resulting gaps (left/right/bottom/top)
 
 Outputs
@@ -26,7 +26,7 @@ import numpy as np
 A_NM  = math.sqrt(2.0) * 4.1436457 / 2.0 / 10.0          # 0.29319457 nm
 LY_NM = math.sqrt(3.0) / 2.0 * A_NM                      # 0.253934 nm
 SURF  = {"AU", "AUI", "AUC"}
-EPS   = 1e-6   # 1 pm tolerance for boundary tests
+EPS   = 1e-6   # 1 pm tolerance for boundary tests
 
 # ─── minimal .gro helpers ───────────────────────────────────────────
 def read_gro(p: Path):
@@ -89,22 +89,19 @@ def enlarge_and_shift(old_gro: Path, pad_nm: float):
     anchor = min(gold, key=lambda a: (a["y"], a["x"]))
     ax, ay = anchor["x"], anchor["y"]
 
-    # slab centre for COM metric
-    cx, cy = 0.5 * Lx, 0.5 * Ly
-
-    # --- search integer (m,n) that fits AND centres COM as much as possible
+    # --- search integer (m,n) that fits AND balances gaps in x and y
     candidates = []
-    for n in range(-Ny, Ny + 1):
+    for n in range(-2*Ny, 2*Ny + 1):
         dy = n * LY_NM - ay
-        for m in range(-Nx, Nx + 1):
+        for m in range(-2*Nx, 2*Nx + 1):
             dx = m * A_NM + 0.5 * n * A_NM - ax
             x_shift = xs + dx
             y_shift = ys + dy
             if (x_shift.min() >= -EPS and x_shift.max() <= Lx + EPS and
                 y_shift.min() >= -EPS and y_shift.max() <= Ly + EPS):
-                com_dist = math.hypot(x_shift.mean() - cx,
-                                      y_shift.mean() - cy)
-                candidates.append((com_dist, m, n, dx, dy))
+                asym = abs(x_shift.min() - (Lx - x_shift.max())) + \
+                       abs(y_shift.min() - (Ly - y_shift.max()))
+                candidates.append((asym, m, n, dx, dy))
     if not candidates:
         sys.exit("No lattice translation fits – increase padding.")
 
@@ -148,4 +145,3 @@ if __name__ == "__main__":
                         help="padding in nm around protein (default 1.0 nm = 10 Å)")
     args = parser.parse_args()
     enlarge_and_shift(Path(args.gro), args.pad)
-
